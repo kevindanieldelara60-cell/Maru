@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Grecia</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+  background: #000 url('https://i.ibb.co/wrS2DXRS/Screenshot-2026-06-28-14-20-53-367-com-whatsapp.jpg') center/cover no-repeat;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+  }
+  canvas { display: block; }
+  #center-text {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    font-family: 'Georgia', serif;
+    font-size: clamp(2.2rem, 7vw, 4.5rem);
+    font-style: italic;
+    color: transparent;
+    background: linear-gradient(135deg, #ff6eb4, #ff1493, #ffb6d9, #ff69b4);
+    -webkit-background-clip: text;
+    background-clip: text;
+    pointer-events: none;
+    letter-spacing: 0.05em;
+    z-index: 10;
+    user-select: none;
+    will-change: transform;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="center-text">Greicy</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const textEl = document.getElementById('center-text');
+
+let W = canvas.width = window.innerWidth;
+let H = canvas.height = window.innerHeight;
+
+let floatT = 0;
+function updateFloatText() {
+  floatT += 0.022;
+  const floatY = Math.sin(floatT * 0.8) * 22 + Math.sin(floatT * 1.3) * 8;
+  const floatX = Math.sin(floatT * 0.5) * 10;
+  const sc = 1 + Math.sin(floatT * 0.9) * 0.06;
+  const g1 = 20 + Math.sin(floatT) * 12;
+  const g2 = 50 + Math.sin(floatT * 0.7) * 20;
+  textEl.style.transform = `translate(calc(-50% + ${floatX}px), calc(-50% + ${floatY}px)) scale(${sc})`;
+  textEl.style.filter = `drop-shadow(0 0 ${g1}px #ff69b4dd) drop-shadow(0 0 ${g2}px #ff1493aa)`;
+  textEl.style.opacity = 0.82 + Math.sin(floatT * 1.2) * 0.18;
+}
+
+function heartPoint(t) {
+  const x = 16 * Math.pow(Math.sin(t), 3);
+  const y = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
+  return { x, y };
+}
+
+let scale = Math.min(W, H) * 0.027;
+
+const HEART_COUNT = 1800;
+const heartTargets = [];
+for (let i = 0; i < HEART_COUNT; i++) {
+  const t = (i / HEART_COUNT) * Math.PI * 2;
+  const p = heartPoint(t);
+  const spread = Math.random() * 2.0 + 0.1;
+  heartTargets.push({
+    tx: p.x * scale + (Math.random()-0.5) * scale * spread,
+    ty: p.y * scale + (Math.random()-0.5) * scale * spread,
+  });
+}
+
+class HeartParticle {
+  constructor(i) {
+    const ht = heartTargets[i];
+    this.bx = ht.tx; this.by = ht.ty;
+    this.x = (Math.random()-0.5)*W*0.8;
+    this.y = (Math.random()-0.5)*H*0.8;
+    this.size = Math.random() * 2.0 + 0.4;
+    this.r = Math.round(220 + Math.random()*35);
+    this.g = Math.round(50 + Math.random()*60);
+    this.b = Math.round(120 + Math.random()*80);
+    this.alpha = 0;
+    this.targetAlpha = Math.random() * 0.7 + 0.3;
+    this.speed = Math.random() * 0.032 + 0.008;
+    this.twinkle = Math.random() * Math.PI * 2;
+    this.twinkleSpeed = Math.random() * 0.05 + 0.008;
+    this.settled = false;
+  }
+  update() {
+    const tx = W/2 + this.bx, ty = H/2 + this.by;
+    this.x += (tx - this.x) * this.speed;
+    this.y += (ty - this.y) * this.speed;
+    this.alpha += (this.targetAlpha - this.alpha) * 0.025;
+    this.twinkle += this.twinkleSpeed;
+    if (!this.settled && Math.hypot(tx - this.x, ty - this.y) < 1) this.settled = true;
+  }
+  draw() {
+    const a = this.alpha * (0.6 + 0.4 * Math.sin(this.twinkle));
+    ctx.globalAlpha = a;
+    ctx.fillStyle = `rgb(${this.r},${this.g},${this.b})`;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, 6.2832);
+    ctx.fill();
+  }
+}
+
+const heartParticles = Array.from({length: HEART_COUNT}, (_, i) => new HeartParticle(i));
+
+function getTextPoints(text, fontSize, cw, ch, step) {
+  const oc = document.createElement('canvas');
+  oc.width = cw; oc.height = ch;
+  const ox = oc.getContext('2d');
+  ox.fillStyle = '#fff';
+  ox.font = `bold ${fontSize}px Georgia`;
+  ox.textAlign = 'center';
+  ox.textBaseline = 'middle';
+  ox.fillText(text, cw/2, ch/2);
+  const data = ox.getImageData(0, 0, cw, ch).data;
+  const pts = [];
+  for (let y = 0; y < ch; y += step)
+    for (let x = 0; x < cw; x += step)
+      if (data[(y * cw + x) * 4 + 3] > 100)
+        pts.push({ x: x - cw/2, y: y - ch/2 });
+  return pts;
+}
+
+const phrases = [
+  { text: "te amo",    fs: 32, w: 260, h: 75, step: 3 },
+  { text: "te quiero", fs: 32, w: 300, h: 75, step: 3 },
+  { text: "wapa",      fs: 38, w: 190, h: 75, step: 3 },
+  { text: "♥♥",        fs: 42, w: 150, h: 75, step: 3 },
+  { text: "muak",      fs: 36, w: 190, h: 75, step: 3 },
+];
+phrases.forEach(p => { p.points = getTextPoints(p.text, p.fs, p.w, p.h, p.step); });
+
+const trailBursts = [];
+let lastTrailTime = 0;
+let trailPhraseIdx = 0;
+
+class TrailBurst {
+  constructor(cx, cy) {
+    const ph = phrases[trailPhraseIdx % phrases.length];
+    const pts = ph.points;
+    const s = 0.42;
+    this.particles = [];
+    const maxPts = 70;
+    const step = Math.max(1, Math.floor(pts.length / maxPts));
+    for (let i = 0; i < pts.length; i += step) {
+      const p = pts[i];
+      this.particles.push({
+        x: cx + p.x * s,
+        y: cy + p.y * s,
+        size: Math.random() * 1.2 + 0.4,
+        hue: Math.random() * 40 - 20,
+      });
+    }
+    this.life = 1.0;
+  }
+  update() { this.life -= 0.028; }
+  draw() {
+    const a = Math.max(0, this.life * this.life * 0.85);
+    this.particles.forEach(p => {
+      ctx.globalAlpha = a;
+      ctx.fillStyle = `hsl(${330+p.hue},90%,75%)`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, 6.2832);
+      ctx.fill();
+    });
+  }
+  isDead() { return this.life <= 0; }
+}
+
+function spawnTrail(x, y) {
+  const now = Date.now();
+  if (now - lastTrailTime > 130) {
+    trailBursts.push(new TrailBurst(x, y));
+    if (trailBursts.length > 25) trailBursts.splice(0, trailBursts.length - 25);
+    lastTrailTime = now;
+  }
+}
+
+const tapBursts = [];
+let tapCount = 0;
+
+class PhraseBurst {
+  constructor(cx, cy) {
+    const ph = phrases[Math.floor(Math.random() * phrases.length)];
+    const pts = ph.points;
+    const s = 0.8;
+    this.particles = [];
+    const maxPts = 150;
+    const step = Math.max(1, Math.floor(pts.length / maxPts));
+    for (let i = 0; i < pts.length; i += step) {
+      const p = pts[i];
+      this.particles.push({
+        x: cx + (Math.random()-0.5)*35, y: cy + (Math.random()-0.5)*35,
+        tx: cx + p.x * s, ty: cy + p.y * s,
+        size: Math.random() * 2 + 0.7,
+        alpha: 0, hue: Math.random() * 50 - 25,
+        speed: Math.random() * 0.1 + 0.05,
+      });
+    }
+    this.life = 1.0; this.formed = false; this._ft = null;
+  }
+  update() {
+    let all = true;
+    this.particles.forEach(p => {
+      p.x += (p.tx - p.x) * p.speed;
+      p.y += (p.ty - p.y) * p.speed;
+      p.alpha = Math.min(p.alpha + 0.06, 1);
+      if (Math.hypot(p.tx-p.x, p.ty-p.y) > 3) all = false;
+    });
+    if (all && !this.formed) { this.formed = true; this._ft = Date.now(); }
+    if (this.formed && Date.now() - this._ft > 1000) this.life -= 0.022;
+  }
+  draw() {
+    this.particles.forEach(p => {
+      ctx.globalAlpha = Math.max(0, p.alpha * this.life);
+      ctx.fillStyle = `hsl(${330+p.hue},90%,70%)`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, 6.2832);
+      ctx.fill();
+    });
+  }
+  isDead() { return this.life <= 0; }
+}
+
+class SparkleBurst {
+  constructor(cx, cy) {
+    this.particles = Array.from({length: 80}, () => {
+      const a = Math.random() * 6.2832;
+      const sp = Math.random() * 5 + 2;
+      return { x: cx, y: cy, vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
+               size: Math.random()*2.5+1, hue: Math.random()*60-30 };
+    });
+    this.life = 1.0;
+  }
+  update() {
+    this.life -= 0.022;
+    this.particles.forEach(p => { p.x+=p.vx; p.y+=p.vy; p.vy+=0.1; p.vx*=0.97; p.vy*=0.97; });
+  }
+  draw() {
+    this.particles.forEach(p => {
+      ctx.globalAlpha = Math.max(0, this.life * this.life);
+      ctx.fillStyle = `hsl(${330+p.hue},95%,80%)`;
+      ctx.save(); ctx.translate(p.x, p.y);
+      ctx.beginPath();
+      for (let i = 0; i < 4; i++) {
+        const a = (i/4)*6.2832;
+        ctx.lineTo(Math.cos(a)*p.size*2.2, Math.sin(a)*p.size*2.2);
+        ctx.lineTo(Math.cos(a+0.785)*p.size*0.5, Math.sin(a+0.785)*p.size*0.5);
+      }
+      ctx.closePath(); ctx.fill(); ctx.restore();
+    });
+  }
+  isDead() { return this.life <= 0; }
+}
+
+class ExplosionBurst {
+  constructor(cx, cy) {
+    this.cx = cx; this.cy = cy;
+    this.particles = Array.from({length: 200}, () => {
+      const a = Math.random()*6.2832, sp = Math.random()*8+2;
+      return { x:cx, y:cy, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp,
+               size:Math.random()*3.5+1, hue:Math.random()*60-30,
+               isStar: Math.random()<0.4 };
+    });
+    this.ringR = 0; this.life = 1.0;
+  }
+  update() {
+    this.life -= 0.016; this.ringR += 12;
+    this.particles.forEach(p => { p.x+=p.vx; p.y+=p.vy; p.vx*=0.96; p.vy*=0.96; p.vy+=0.07; });
+  }
+  draw() {
+    const ringA = Math.max(0, this.life*2-1);
+    if (ringA > 0) {
+      ctx.globalAlpha = ringA * 0.7;
+      ctx.strokeStyle = '#ff69b4'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(this.cx, this.cy, this.ringR, 0, 6.2832); ctx.stroke();
+      ctx.globalAlpha = ringA * 0.3;
+      ctx.strokeStyle = '#ffb6d9'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(this.cx, this.cy, this.ringR*0.65, 0, 6.2832); ctx.stroke();
+    }
+    if (this.life > 0.5) {
+      const grad = ctx.createRadialGradient(this.cx,this.cy,0,this.cx,this.cy,90*(this.life-0.3));
+      grad.addColorStop(0,`rgba(255,105,180,${(this.life-0.5)*0.9})`);
+      grad.addColorStop(1,'rgba(255,20,147,0)');
+      ctx.globalAlpha = 1; ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(this.cx,this.cy,90,0,6.2832); ctx.fill();
+    }
+    this.particles.forEach(p => {
+      ctx.globalAlpha = Math.max(0, this.life*this.life);
+      ctx.fillStyle = `hsl(${320+p.hue},95%,${65+(1-this.life)*20}%)`;
+      if (p.isStar) {
+        ctx.save(); ctx.translate(p.x,p.y);
+        ctx.beginPath();
+        for (let i=0;i<4;i++){const a=(i/4)*6.2832;ctx.lineTo(Math.cos(a)*p.size*2.5,Math.sin(a)*p.size*2.5);ctx.lineTo(Math.cos(a+0.785)*p.size*0.6,Math.sin(a+0.785)*p.size*0.6);}
+        ctx.closePath(); ctx.fill(); ctx.restore();
+      } else {
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,6.2832); ctx.fill();
+      }
+    });
+  }
+  isDead() { return this.life <= 0; }
+}
+
+function onMove(x, y) { spawnTrail(x, y); }
+
+function onTap(x, y) {
+  tapCount++;
+  trailPhraseIdx = Math.floor(Math.random() * phrases.length);
+  if (tapCount % 5 === 0) tapBursts.push(new ExplosionBurst(x, y));
+  else if (tapCount % 3 === 0) tapBursts.push(new SparkleBurst(x, y));
+  else tapBursts.push(new PhraseBurst(x, y));
+  if (tapBursts.length > 12) tapBursts.splice(0, tapBursts.length - 12);
+}
+
+canvas.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
+canvas.addEventListener('click', e => onTap(e.clientX, e.clientY));
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  for (const t of e.touches) onMove(t.clientX, t.clientY);
+}, { passive: false });
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  for (const t of e.touches) onTap(t.clientX, t.clientY);
+}, { passive: false });
+
+window.addEventListener('resize', () => {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  scale = Math.min(W, H) * 0.027;
+});
+
+let frameCount = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  frameCount++;
+  updateFloatText();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0, 0, W, H);
+  const batchSize = Math.ceil(HEART_COUNT / 2);
+  const start = (frameCount % 2) * batchSize;
+  for (let i = start; i < Math.min(start + batchSize, HEART_COUNT); i++) heartParticles[i].update();
+  heartParticles.forEach(p => p.draw());
+  for (let i = trailBursts.length-1; i>=0; i--) {
+    trailBursts[i].update(); trailBursts[i].draw();
+    if (trailBursts[i].isDead()) trailBursts.splice(i,1);
+  }
+  for (let i = tapBursts.length-1; i>=0; i--) {
+    tapBursts[i].update(); tapBursts[i].draw();
+    if (tapBursts[i].isDead()) tapBursts.splice(i,1);
+  }
+  ctx.globalAlpha = 1;
+}
+animate();
+</script>
+</body>
+  </html>
